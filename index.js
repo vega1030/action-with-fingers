@@ -5,18 +5,24 @@ const canvasElement = document.querySelector('#canvas');
 const canvasCtx = canvasElement.getContext('2d');
 
 
-const isFingerUp = (landmarks, tipIdx, pipIdx) => {
-    return landmarks[ tipIdx ].y < landmarks[ pipIdx ].y;
+const isFingerUp = (tip, pip, axis = 'y', threshold = 0.02) => {
+    return (pip[ axis ] - tip[ axis ]) > threshold;
 }
 
 const getFingersStatus = (landmarks) => {
     return {
-        pulgar: isFingerUp(landmarks, 4, 2),
-        indice: isFingerUp(landmarks, 8, 6),
-        medio: isFingerUp(landmarks, 12, 10),
-        anular: isFingerUp(landmarks, 16, 14),
-        meñique: isFingerUp(landmarks, 20, 18),
+        pulgar: isFingerUp(landmarks[ 4 ], landmarks[ 3 ], 'x'),
+        indice: isFingerUp(landmarks[ 8 ], landmarks[ 6 ]),
+        medio: isFingerUp(landmarks[ 12 ], landmarks[ 10 ]),
+        anular: isFingerUp(landmarks[ 16 ], landmarks[ 14 ]),
+        meñique: isFingerUp(landmarks[ 20 ], landmarks[ 18 ]),
     };
+}
+
+const drawTest = (ctx, text, x, y) => {
+    ctx.font = `1.25rem, Arial`;
+    ctx.fillStyle = 'cyan';
+    ctx.fillText(text, x, y);
 }
 
 const videoElement = document.querySelector('#webcam');
@@ -96,22 +102,33 @@ let lastLogTime = 0;
 const logInterval = 1000; // 1 segundo
 
 hands.onResults((results) => {
-    const now = Date.now();
-    if (now - lastLogTime > logInterval) {
-        lastLogTime = now;
+    canvasCtx.save();
+    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+    if(!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+        canvasCtx.restore();
+        return;
     }
-    const landmarks = results.multiHandLandmarks?.[ 0 ];
-    if (!landmarks) return;
-    const dedos = getFingersStatus(landmarks);
+    const landmarks = results.multiHandLandmarks[ 0 ];
+    const fingers = getFingersStatus(landmarks);
 
+    for (const [ name, isUp ] of Object.entries(fingers)) {
+        if (isUp) {
+            let tipIndex
+            switch (name) {
+                case 'pulgar': tipIndex = 4; break;
+                case 'indice': tipIndex = 8; break;
+                case 'medio': tipIndex = 12; break;
+                case 'anular': tipIndex = 16; break;
+                case 'meñique': tipIndex = 20; break;
+            }
+            const x = landmarks[ tipIndex ].x * canvasElement.width;
+            const y = landmarks[ tipIndex ].y * canvasElement.height;
 
-    const estado = Object.entries(dedos)
-        .map(([ dedo, levantado ]) => `${ dedo }: ${ levantado ? '↑' : '↓' }`)
-        .join(' | ');
-
-    console.log(estado);
-
-});
+            drawTest(canvasCtx, name.toUpperCase(), x, y);
+        }
+}
+        canvasCtx.restore();
+    })
 
 
 /* startButton.addEventListener('click', async () => {
